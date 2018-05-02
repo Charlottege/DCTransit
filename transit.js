@@ -70,16 +70,22 @@ app.get('/', (req, response) => {
     html += "<p>StopName: " + result.stop.Name + "</p>";
 
     //routes
-    html += "<p>Routes: ";
+    html += "<p>All Routes: ";
     var routes = result.stop.Routes;
+    var stop_route = [];
     if (routes && routes.length > 0) {
       for (var i = 0; i < routes.length; i++) {
+        stop_route[i]={'routeID' : routes[i], 'stopID' : result.stop.StopID};
         html += routes[i] + ", ";
       }
     } else {
       html += "0 Route";
     }
     html += "</p>";
+
+    // filter routes
+    html += "<p>Routes Wanted: " + stop_route[1] + "</p>";
+
 
     //Search Result
     html += "<p>Search Result Count: " + result.searchResultCount + "</p>";
