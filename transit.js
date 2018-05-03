@@ -2,11 +2,16 @@ var request = require('request');
 var moment = require('moment');
 const fs = require('fs');
 
-fs.readFile('data.txt', 'utf8', (err, data) => {
-  if (err) throw err;
-  console.log(data);
-});
+const delay = (ms) => {   const startPoint = new Date().getTime();   while (new Date().getTime() - startPoint <= ms) {/* wait */} }
 
+var StopRouteData = fs.readFileSync('StopwithRoute.txt', 'utf8', (err, data) => {
+  if (err) throw err;
+ });
+
+var Dataline = [];
+for (var j = 0; j < StopRouteData.split('\n').length; j ++){
+  Dataline.push({'StopID' : StopRouteData.split('\n')[j].split(',')[0], 'RouteID' : StopRouteData.split('\n')[j].split(',')[1].replace(/[\n\r]+/g,"")});
+}
 
 function processResponse(body, startTime, endTime) {
     var data = {};
@@ -14,7 +19,7 @@ function processResponse(body, startTime, endTime) {
     //console.log(body.Stop);
     var arrivals = body.ScheduleArrivals;
     //console.log("Total arrival count: " + count);
-    var searchResult = filterWithTimeRange(startTime, endTime, arrivals);
+    var searchResult = filterWithTimeRange(startTime, endTime, arrivals); 
     //console.log(searchResult);
     data.searchResult = searchResult;
     data.searchResultCount = searchResult.length;
@@ -53,65 +58,88 @@ app.use((request, response, next) => {
 })
 
 app.get('/', (req, response) => {
-  var stopId = req.query.stopId;
+  //var stopId = req.query.stopId;
+  //var stopId = Dataline[1].StopID;
   var date = req.query.date;
   var startTime = date + "T" + req.query.startTime;
   var endTime = date + "T" + req.query.endTime;
-
-  var url = 'https://api.wmata.com/Bus.svc/json/jStopSchedule?StopID='+stopId+'&Date='+date;
+  
   var headers = {
     'api_key': 'b2cfdaf549384639abd1681a80fc7aeb'
   };
 
-  var result = {};
+  var html = "<!DOCTYPE html><html><body><h1>Washington Metropolitan Area Transit Authority Search Result</h1>";
+  html += "<p>StartTime: " + startTime+ "</p>";
+  html += "<p>EndTime: " + endTime + "</p>";
 
-  request({ url: url, headers: headers, json: true }, (err, res, body) => {
-    if (err) { return console.log(err); }
-    result = processResponse(body, startTime, endTime);
-    //response.json(result)
-    var html = "<!DOCTYPE html><html><body><h1>Washington Metropolitan Area Transit Authority Search Result</h1>";
-    html += "<p>StartTime: " + startTime+ "</p>";
-    html += "<p>EndTime: " + endTime + "</p>";
-    html += "<p>StopID: " + result.stop.StopID + "</p>";
-    html += "<p>StopName: " + result.stop.Name + "</p>";
-
-    //routes
-    html += "<p>All Routes: ";
-    var routes = result.stop.Routes;
-    var stop_route = [];
-    if (routes && routes.length > 0) {
-      for (var i = 0; i < routes.length; i++) {
-        stop_route[i]={'routeID' : routes[i], 'stopID' : result.stop.StopID};
-        html += routes[i] + ", ";
-      }
-    } else {
-      html += "0 Route";
-    }
-    html += "</p>";
-
-    // filter routes
-    html += "<p>Routes Wanted: " + stop_route[1] + "</p>";
-
-
-    //Search Result
-    html += "<p>Search Result Count: " + result.searchResultCount + "</p>";
+  var responseCount = 0;
+  for (var k = 0; k < Dataline.length; k++) {
     
-    var searchResult = result.searchResult;
-    if (searchResult && searchResult.length > 0) {
-      html += "<table><tr><th>ScheduleTime</th><th>RouteID</th><th>TripID</th><th>TripHeadsign</th></tr>";
-      for (var j = 0; j < searchResult.length; j++) {
-        html += "<tr><td>" + searchResult[j].ScheduleTime + "</td>";
-        html += "<td>" + searchResult[j].RouteID + "</td>";
-        html += "<td>" + searchResult[j].TripID + "</td>";
-        html += "<td>" + searchResult[j].TripHeadsign + "</td></tr>";
-      }
-    }
-    html += "</table>";    
+      console.log(Dataline[k]);
 
-    html += "</body></html>";
+      var stopId = Dataline[k].StopID;
+      var result = {};
 
-    response.send(html)
-  });
+      var url = 'https://api.wmata.com/Bus.svc/json/jStopSchedule?StopID='+stopId+'&Date='+date;
+      request({ url: url, headers: headers, json: true }, apiCallback(k));
+      function apiCallback(k) {
+        return function(err, res, body) {
+          if (err) { return console.log(err); }
+          responseCount++;
+          result = processResponse(body, startTime, endTime);
+          //response.json(result)
+       
+          html += "<p>StopID: " + result.stop.StopID + "</p>";
+          html += "<p>StopName: " + result.stop.Name + "</p>";
+
+          //routes
+          html += "<p>All Routes: ";
+          var routes = result.stop.Routes;
+          if (routes && routes.length > 0) {
+            for (var i = 0; i < routes.length; i++) {
+              html += routes[i] + ", ";
+            }
+          } else {
+            html += "0 Route";
+          }
+          html += "</p>";
+
+          //selected routes
+          html += "<p>Selected Routes: ";
+          html += Dataline[k].RouteID;
+          html += "</p>";
+
+          //Search Result
+          //html += "<p>Search Result Count: " + result.searchResultCount + "</p>";
+          var counter = 0;
+          var searchResult = result.searchResult;
+          if (searchResult && searchResult.length > 0) {
+            html += "<table><tr><th>ScheduleTime</th><th>RouteID</th><th>TripID</th><th>TripHeadsign</th></tr>";
+
+            for (var j = 0; j < searchResult.length; j++) {
+              if (searchResult[j].RouteID == Dataline[k].RouteID){
+                counter++;
+                html += "<tr><td>" + searchResult[j].ScheduleTime + "</td>";
+                html += "<td>" + searchResult[j].RouteID + "</td>";
+                html += "<td>" + searchResult[j].TripID + "</td>";
+                html += "<td>" + searchResult[j].TripHeadsign + "</td></tr>";
+              } 
+            }
+          }
+          html += "</table>";
+
+          html += "<p>Search Result Count: " + counter + "</p>";
+
+          if (responseCount == Dataline.length) {
+              html += "</body></html>";
+
+              response.send(html);
+          }
+        }
+      } 
+    
+      delay(1000);
+  }  
 
 })
 
@@ -119,3 +147,4 @@ app.get('/', (req, response) => {
 
 
 app.listen(3000)
+
