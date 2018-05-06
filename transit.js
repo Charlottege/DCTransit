@@ -1,7 +1,11 @@
-var request = require('request');
 var moment = require('moment');
 const fs = require('fs');
 
+//var request = require('request'); //add API request limit control
+var limit = require("simple-rate-limiter");
+var request = limit(require("request")).to(5).per(2000);
+
+//delay() not used anymore
 const delay = (ms) => {   const startPoint = new Date().getTime();   while (new Date().getTime() - startPoint <= ms) {/* wait */} }
 
 var StopRouteData = fs.readFileSync('StopwithRoute.txt', 'utf8', (err, data) => {
@@ -11,7 +15,9 @@ var StopRouteData = fs.readFileSync('StopwithRoute.txt', 'utf8', (err, data) => 
 var Dataline = [];
 var datarow = StopRouteData.split('\n');
 for (var j = 0; j < datarow.length; j ++){
-  Dataline.push({'StopID' : datarow[j].replace(/[\n\r]+/g,"")});
+  if (datarow[j].length > 0) {
+    Dataline.push({'StopID' : datarow[j].replace(/[\n\r]+/g,"")});
+  }
 }
 
 function processResponse(body, startTime, endTime) {
@@ -77,20 +83,24 @@ app.get('/', (req, response) => {
   var responseCount = 0;
   for (var k = 0; k < Dataline.length; k++) {
     
-      console.log(Dataline[k]);
+      //console.log(Dataline[k]);
 
       var stopId = Dataline[k].StopID;
       var result = {};
       var url = 'https://api.wmata.com/Bus.svc/json/jStopSchedule?StopID='+stopId+'&Date='+date;
-      
+
       request({ url: url, headers: headers, json: true }, apiCallback(k));
       function apiCallback(k) { 
         return function(err, res, body) {
           if (err) { return console.log(err); }
+
           responseCount++;
-          result = processResponse(body, startTime, endTime);
+          console.log("Processing Stop:" + Dataline[k].StopID);
           
-          //response.json(result)
+          result = processResponse(body, startTime, endTime);
+          if(!result.stop) {
+            console.log(body);
+          }
           
           //routes
           //html += "<p>All Routes: ";
@@ -110,8 +120,8 @@ app.get('/', (req, response) => {
           var SelectedRoutes = [];
 
           /*
-          if this stop is the terminus for route, then add the route to array, and count how many times terminus routes stop
-          */
+           * if this stop is the terminus for route, then add the route to array, and count how many times terminus routes stop
+           */
           if (searchResult && searchResult.length > 0) {
             for (var j = 0; j < searchResult.length; j++) {
               if (searchResult[j].ScheduleTime === searchResult[j].StartTime || searchResult[j].ScheduleTime === searchResult[j].EndTime){
@@ -121,34 +131,29 @@ app.get('/', (req, response) => {
                 counter++;
               }
             }
-           console.log(SelectedRoutes); 
-          
+            console.log("Found Terminus Route: [" + SelectedRoutes + "]"); 
            
-            //html += "<td>" + searchResult[j].RouteID + "</td>";
-            //html += "<td>" + searchResult[j].TripID + "</td>";
-            //html += "<td>" + searchResult[j].TripHeadsign + "</td></tr>";
           }
           
-          console.log(result);
-          if (!result.stop) {
-            console.log(result);
-            console.log("K =" + k);
-          }
           html += "<tr><td>" + result.stop.StopID +"</td>";
           html += "<td><center>" + SelectedRoutes + "</center></td>";
           html += "<td><center>" + counter + "</center></td>";
           html += "<td>" + result.stop.Name + "</td></tr>"; 
 
+          console.log("Stop " + Dataline[k].StopID + " complete.\n");
+
           if (responseCount == Dataline.length) {
               html += "</table>";
               html += "</body></html>";
 
+              console.log("----------------------");
+              console.log("All finished. " + Dataline.length + " stopIDs processed.");
               response.send(html);
           }
         } 
          
       } 
-      delay(1000);
+
   } 
 
 })
