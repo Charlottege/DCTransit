@@ -9,8 +9,9 @@ var StopRouteData = fs.readFileSync('StopwithRoute.txt', 'utf8', (err, data) => 
  });
 
 var Dataline = [];
-for (var j = 0; j < StopRouteData.split('\n').length; j ++){
-  Dataline.push({'StopID' : StopRouteData.split('\n')[j].split(',')[0], 'RouteID' : StopRouteData.split('\n')[j].split(',')[1].replace(/[\n\r]+/g,"")});
+var datarow = StopRouteData.split('\n');
+for (var j = 0; j < datarow.length; j ++){
+  Dataline.push({'StopID' : datarow[j].replace(/[\n\r]+/g,"")});
 }
 
 function processResponse(body, startTime, endTime) {
@@ -71,7 +72,8 @@ app.get('/', (req, response) => {
   var html = "<!DOCTYPE html><html><body><h1>Washington Metropolitan Area Transit Authority Search Result</h1>";
   html += "<p>StartTime: " + startTime+ "</p>";
   html += "<p>EndTime: " + endTime + "</p>";
-
+    
+  html += "<table><tr><th>StopID</th><th>SelectedRouteID</th><th>searchResultCount</th><th>StopName</th></tr>";
   var responseCount = 0;
   for (var k = 0; k < Dataline.length; k++) {
     
@@ -79,67 +81,75 @@ app.get('/', (req, response) => {
 
       var stopId = Dataline[k].StopID;
       var result = {};
-
       var url = 'https://api.wmata.com/Bus.svc/json/jStopSchedule?StopID='+stopId+'&Date='+date;
+      
       request({ url: url, headers: headers, json: true }, apiCallback(k));
-      function apiCallback(k) {
+      function apiCallback(k) { 
         return function(err, res, body) {
           if (err) { return console.log(err); }
           responseCount++;
           result = processResponse(body, startTime, endTime);
+          
           //response.json(result)
-       
-          html += "<p>StopID: " + result.stop.StopID + "</p>";
-          html += "<p>StopName: " + result.stop.Name + "</p>";
-
+          
           //routes
-          html += "<p>All Routes: ";
-          var routes = result.stop.Routes;
-          if (routes && routes.length > 0) {
-            for (var i = 0; i < routes.length; i++) {
-              html += routes[i] + ", ";
-            }
-          } else {
-            html += "0 Route";
-          }
-          html += "</p>";
-
-          //selected routes
-          html += "<p>Selected Routes: ";
-          html += Dataline[k].RouteID;
-          html += "</p>";
+          //html += "<p>All Routes: ";
+          //var routes = result.stop.Routes;
+          //if (routes && routes.length > 0) {
+            //for (var i = 0; i < routes.length; i++) {
+              //html += routes[i] + ", ";
+            //}
+          //} else {
+            //html += "0 Route";
+          //}
+          //html += "</p>";
 
           //Search Result
-          //html += "<p>Search Result Count: " + result.searchResultCount + "</p>";
           var counter = 0;
           var searchResult = result.searchResult;
+          var SelectedRoutes = [];
+
+          /*
+          if this stop is the terminus for route, then add the route to array, and count how many times terminus routes stop
+          */
           if (searchResult && searchResult.length > 0) {
-            html += "<table><tr><th>ScheduleTime</th><th>RouteID</th><th>TripID</th><th>TripHeadsign</th></tr>";
-
             for (var j = 0; j < searchResult.length; j++) {
-              if (searchResult[j].RouteID == Dataline[k].RouteID){
+              if (searchResult[j].ScheduleTime === searchResult[j].StartTime || searchResult[j].ScheduleTime === searchResult[j].EndTime){
+                  if (!SelectedRoutes.includes(searchResult[j].RouteID)) {
+                    SelectedRoutes.push(searchResult[j].RouteID);
+                  }            
                 counter++;
-                html += "<tr><td>" + searchResult[j].ScheduleTime + "</td>";
-                html += "<td>" + searchResult[j].RouteID + "</td>";
-                html += "<td>" + searchResult[j].TripID + "</td>";
-                html += "<td>" + searchResult[j].TripHeadsign + "</td></tr>";
-              } 
+              }
             }
+           console.log(SelectedRoutes); 
+          
+           
+            //html += "<td>" + searchResult[j].RouteID + "</td>";
+            //html += "<td>" + searchResult[j].TripID + "</td>";
+            //html += "<td>" + searchResult[j].TripHeadsign + "</td></tr>";
           }
-          html += "</table>";
-
-          html += "<p>Search Result Count: " + counter + "</p>";
+          
+          console.log(result);
+          if (!result.stop) {
+            console.log(result);
+            console.log("K =" + k);
+          }
+          html += "<tr><td>" + result.stop.StopID +"</td>";
+          html += "<td><center>" + SelectedRoutes + "</center></td>";
+          html += "<td><center>" + counter + "</center></td>";
+          html += "<td>" + result.stop.Name + "</td></tr>"; 
 
           if (responseCount == Dataline.length) {
+              html += "</table>";
               html += "</body></html>";
 
               response.send(html);
           }
-        }
+        } 
+         
       } 
-    
       delay(1000);
-  }  
+  } 
 
 })
 
