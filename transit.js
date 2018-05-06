@@ -131,7 +131,7 @@ app.get('/', (req, response) => {
                 counter++;
               }
             }
-            console.log(SelectedRoutes); 
+            console.log("Found Terminus Route: [" + SelectedRoutes + "]"); 
            
           }
           
@@ -140,13 +140,14 @@ app.get('/', (req, response) => {
           html += "<td><center>" + counter + "</center></td>";
           html += "<td>" + result.stop.Name + "</td></tr>"; 
 
-          console.log("Stop " + Dataline[k].StopID + " complete.");
+          console.log("Stop " + Dataline[k].StopID + " complete.\n");
 
           if (responseCount == Dataline.length) {
               html += "</table>";
               html += "</body></html>";
 
-              console.log("All finished." + Dataline.length + " stopIDs processed.");
+              console.log("----------------------");
+              console.log("All finished. " + Dataline.length + " stopIDs processed.");
               response.send(html);
           }
         } 
