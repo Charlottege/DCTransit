@@ -90,88 +90,91 @@ function main() {
   // html += "<p>EndTime: " + endTime + "</p>";
   var stream = fs.createWriteStream("result.txt");
   stream.once('open', function(fd) {
-    stream.write("My first row\n");
-    stream.write("My second row\n");
-    stream.end();
+
+    stream.write("StartTime: " + startTime + "\n");
+    stream.write("EndTime: " + endTime + "\n");
+
+    html += "<table><tr><th>StopID</th><th>SelectedRouteID</th><th>searchResultCount</th><th>StopName</th></tr>";
+    var responseCount = 0;
+    for (var k = 0; k < Dataline.length; k++) {
+      
+        //console.log(Dataline[k]);
+
+        var stopId = Dataline[k].StopID;
+        var result = {};
+        var url = 'https://api.wmata.com/Bus.svc/json/jStopSchedule?StopID='+stopId+'&Date='+date;
+
+        request({ url: url, headers: headers, json: true }, apiCallback(k));
+        function apiCallback(k) { 
+          return function(err, res, body) {
+            if (err) { return console.log(err); }
+
+            responseCount++;
+            console.log("Processing Stop:" + Dataline[k].StopID);
+            
+            result = processResponse(body, startTime, endTime);
+            if(!result.stop) {
+              console.log(body);
+            }
+            
+            //routes
+            //html += "<p>All Routes: ";
+            //var routes = result.stop.Routes;
+            //if (routes && routes.length > 0) {
+              //for (var i = 0; i < routes.length; i++) {
+                //html += routes[i] + ", ";
+              //}
+            //} else {
+              //html += "0 Route";
+            //}
+            //html += "</p>";
+
+            //Search Result
+            var counter = 0;
+            var searchResult = result.searchResult;
+            var SelectedRoutes = [];
+
+            
+             // if this stop is the terminus for route, then add the route to array, and count how many times terminus routes stop
+             
+            if (searchResult && searchResult.length > 0) {
+              for (var j = 0; j < searchResult.length; j++) {
+                if (searchResult[j].ScheduleTime === searchResult[j].StartTime || searchResult[j].ScheduleTime === searchResult[j].EndTime){
+                    if (!SelectedRoutes.includes(searchResult[j].RouteID)) {
+                      SelectedRoutes.push(searchResult[j].RouteID);
+                    }            
+                  counter++;
+                }
+              }
+              console.log("Found Terminus Route: [" + SelectedRoutes + "]"); 
+             
+            }
+            
+            // html += "<tr><td>" + result.stop.StopID +"</td>";
+            // html += "<td><center>" + SelectedRoutes + "</center></td>";
+            // html += "<td><center>" + counter + "</center></td>";
+            // html += "<td>" + SelectedRoutes + "</td></tr>"; 
+
+            stream.write(result.stop.StopID + " " + counter + " " + SelectedRoutes + " " + SelectedRoutes + "\n");
+
+            console.log("Stop " + Dataline[k].StopID + " complete.\n");
+
+            if (responseCount == Dataline.length) {
+                // html += "</table>";
+                // html += "</body></html>";
+
+                console.log("----------------------");
+                console.log("All finished. " + Dataline.length + " stopIDs processed.");
+                // response.send(html);
+                stream.end();
+            }
+          } 
+           
+        } 
+
+    } 
   });
 
-    
-  // html += "<table><tr><th>StopID</th><th>SelectedRouteID</th><th>searchResultCount</th><th>StopName</th></tr>";
-  // var responseCount = 0;
-  // for (var k = 0; k < Dataline.length; k++) {
-    
-  //     //console.log(Dataline[k]);
-
-  //     var stopId = Dataline[k].StopID;
-  //     var result = {};
-  //     var url = 'https://api.wmata.com/Bus.svc/json/jStopSchedule?StopID='+stopId+'&Date='+date;
-
-  //     request({ url: url, headers: headers, json: true }, apiCallback(k));
-  //     function apiCallback(k) { 
-  //       return function(err, res, body) {
-  //         if (err) { return console.log(err); }
-
-  //         responseCount++;
-  //         console.log("Processing Stop:" + Dataline[k].StopID);
-          
-  //         result = processResponse(body, startTime, endTime);
-  //         if(!result.stop) {
-  //           console.log(body);
-  //         }
-          
-  //         //routes
-  //         //html += "<p>All Routes: ";
-  //         //var routes = result.stop.Routes;
-  //         //if (routes && routes.length > 0) {
-  //           //for (var i = 0; i < routes.length; i++) {
-  //             //html += routes[i] + ", ";
-  //           //}
-  //         //} else {
-  //           //html += "0 Route";
-  //         //}
-  //         //html += "</p>";
-
-  //         //Search Result
-  //         var counter = 0;
-  //         var searchResult = result.searchResult;
-  //         var SelectedRoutes = [];
-
-          
-  //          * if this stop is the terminus for route, then add the route to array, and count how many times terminus routes stop
-           
-  //         if (searchResult && searchResult.length > 0) {
-  //           for (var j = 0; j < searchResult.length; j++) {
-  //             if (searchResult[j].ScheduleTime === searchResult[j].StartTime || searchResult[j].ScheduleTime === searchResult[j].EndTime){
-  //                 if (!SelectedRoutes.includes(searchResult[j].RouteID)) {
-  //                   SelectedRoutes.push(searchResult[j].RouteID);
-  //                 }            
-  //               counter++;
-  //             }
-  //           }
-  //           console.log("Found Terminus Route: [" + SelectedRoutes + "]"); 
-           
-  //         }
-          
-  //         html += "<tr><td>" + result.stop.StopID +"</td>";
-  //         html += "<td><center>" + SelectedRoutes + "</center></td>";
-  //         html += "<td><center>" + counter + "</center></td>";
-  //         html += "<td>" + result.stop.Name + "</td></tr>"; 
-
-  //         console.log("Stop " + Dataline[k].StopID + " complete.\n");
-
-  //         if (responseCount == Dataline.length) {
-  //             html += "</table>";
-  //             html += "</body></html>";
-
-  //             console.log("----------------------");
-  //             console.log("All finished. " + Dataline.length + " stopIDs processed.");
-  //             response.send(html);
-  //         }
-  //       } 
-         
-  //     } 
-
-  // } 
 }
 
 main();
